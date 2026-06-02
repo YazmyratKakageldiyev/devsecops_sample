@@ -1,12 +1,11 @@
-FROM python:3.11.0b1-buster
+FROM python:3.11-slim
 
 # set work directory
 WORKDIR /app
 
 
 # dependencies for psycopg2
-RUN (apt-get update || (sleep 5 && apt-get update)) && \
-    apt-get install --no-install-recommends -y \
+RUN apt-get update && apt-get install --no-install-recommends -y \
     dnsutils \
     libpq-dev \
     python3-dev \
