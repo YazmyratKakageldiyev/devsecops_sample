@@ -20,20 +20,16 @@ jobs:
         run: pip install bandit
 
       - name: Run Bandit Scan
-        # Сохраняем отчет в формате JSON
         run: bandit -ll -ii -r . -f json -o bandit-report.json
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
-        # Выполнять этот шаг независимо от результата предыдущих
         if: always()
         with:
-          # Имя артефакта при экспорте
           name: bandit-findings.json
           path: bandit-report.json
 
   image_scan:
-    # Каждый новый джоб запускается в новой изолированной среде
     name: Build and Run Image Scan
     runs-on: ubuntu-latest
 
@@ -41,7 +37,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      # Исправление проблемы с DNS / сетью внутри Docker-контейнеров
       - name: Fix Docker DNS
         run: |
           echo '{"dns": ["8.8.8.8", "1.1.1.1"]}' | sudo tee /etc/docker/daemon.json
@@ -58,8 +53,6 @@ jobs:
           command: quickview,cves
           only-severities: critical,high
           sarif-file: scout-report.sarif
-          # По умолчанию exit-code равен true (0). 
-          # true здесь заставит пайплайн упасть, если найдены уязвимости.
           exit-code: true
 
       - name: Upload Artifact
@@ -77,11 +70,23 @@ jobs:
       - name: Checkout My Repository
         uses: actions/checkout@v6
 
-      - name: Verify Directory Structure
-        run: ls -la
+      # Ставим системную библиотеку libjpeg-dev (чтобы Pillow скомпилировался) и сам Nikto через sudo
+      - name: Install System Dependencies and Nikto
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libjpeg-dev zlib1g-dev libpq-dev python3-dev nikto
 
-      - name: Run Installer Script
-        run: bash installer.sh
+      # Поднимаем чистое и изолированное окружение Python
+      - name: Set up Python for DAST
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Устанавливаем зависимости вашего Django проекта безопасным образом
+      - name: Install Python Requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Apply Migrations
         run: python3 manage.py migrate
@@ -95,12 +100,7 @@ jobs:
       - name: Check Server Availability
         run: curl -I http://127.0.0.1:8000
 
-      - name: Install Nikto
-        run: sudo apt-get update && sudo apt-get install -y nikto
-
       - name: Run Nikto Scan
-        # `|| true` гарантирует, что пайплайн не упадет до того, как загрузит отчет, 
-        # даже если Nikto найдет кучу уязвимостей.
         run: |
           nikto -h http://127.0.0.1:8000 -o nikto-report.html -Format html || true
 
