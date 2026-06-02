@@ -1,6 +1,5 @@
-name: CI
+name: CI # Триггер запускает пайплайн при пуше в любую ветку
 
-# triggers pipeline when push is made to any branch (typical CI pipeline rule)
 on: [push]
 
 jobs:
@@ -15,32 +14,38 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: 3.8
+          python-version: '3.8'
 
       - name: Install Bandit
         run: pip install bandit
 
       - name: Run Bandit Scan
-        #safe report in json format
+        # Сохраняем отчет в формате JSON
         run: bandit -ll -ii -r . -f json -o bandit-report.json
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
-        #execute this step no matter of previous status
+        # Выполнять этот шаг независимо от результата предыдущих
         if: always()
         with:
-          #how artifacts will be named when exported
+          # Имя артефакта при экспорте
           name: bandit-findings.json
           path: bandit-report.json
 
   image_scan:
-    #each new job runs in a new isolated environment
+    # Каждый новый джоб запускается в новой изолированной среде
     name: Build and Run Image Scan
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      # Исправление проблемы с DNS / сетью внутри Docker-контейнеров
+      - name: Fix Docker DNS
+        run: |
+          echo '{"dns": ["8.8.8.8", "1.1.1.1"]}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
 
       - name: Build Docker Image
         run: docker build -f Dockerfile -t mytestapp:latest .
@@ -53,7 +58,8 @@ jobs:
           command: quickview,cves
           only-severities: critical,high
           sarif-file: scout-report.sarif
-          #exit code by default is true which means 0, add true to produce non success exit code when vulns are found
+          # По умолчанию exit-code равен true (0). 
+          # true здесь заставит пайплайн упасть, если найдены уязвимости.
           exit-code: true
 
       - name: Upload Artifact
